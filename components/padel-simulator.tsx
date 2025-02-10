@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
@@ -84,42 +84,156 @@ export function PadelSimulator() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
-  useEffect(() => {
-    drawCourt()
-  }, [players, ball, actions, currentAction, showArrows, freeDrawings])
+  const drawCourt = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
 
-  const startRecording = () => {
-    if (!canvasRef.current) return
-    
-    const stream = canvasRef.current.captureStream(60)
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm;codecs=vp9',
-      videoBitsPerSecond: 5000000 // 5 Mbps for high quality
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Clear canvas
+    ctx.clearRect(0, 0, COURT_WIDTH, COURT_HEIGHT)
+
+    // Draw court background
+    ctx.fillStyle = '#87CEEB'
+    ctx.fillRect(0, 0, COURT_WIDTH, COURT_HEIGHT)
+
+    // Draw court walls
+    ctx.strokeStyle = '#666666'
+    ctx.lineWidth = 4
+    ctx.strokeRect(0, 0, COURT_WIDTH, COURT_HEIGHT)
+
+    // Draw court lines
+    ctx.strokeStyle = 'white'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+
+    // Center line
+    ctx.moveTo(COURT_WIDTH / 2, 0)
+    ctx.lineTo(COURT_WIDTH / 2, COURT_HEIGHT)
+
+    // Service lines
+    ctx.moveTo(100, 0)
+    ctx.lineTo(100, COURT_HEIGHT)
+    ctx.moveTo(COURT_WIDTH - 100, 0)
+    ctx.lineTo(COURT_WIDTH - 100, COURT_HEIGHT)
+
+    // Middle service line
+    ctx.moveTo(100, COURT_HEIGHT / 2)
+    ctx.lineTo(COURT_WIDTH - 100, COURT_HEIGHT / 2)
+
+    ctx.stroke()
+
+    // Draw grid for better position reference
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.lineWidth = 1
+    for (let i = 0; i < COURT_WIDTH; i += 50) {
+      ctx.beginPath()
+      ctx.moveTo(i, 0)
+      ctx.lineTo(i, COURT_HEIGHT)
+      ctx.stroke()
+    }
+    for (let i = 0; i < COURT_HEIGHT; i += 50) {
+      ctx.beginPath()
+      ctx.moveTo(0, i)
+      ctx.lineTo(COURT_WIDTH, i)
+      ctx.stroke()
+    }
+
+    // Draw players with shadows
+    players.forEach((player) => {
+      // Draw shadow
+      ctx.beginPath()
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
+      ctx.arc(player.x + 2, player.y + 2, 12, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Draw player
+      ctx.beginPath()
+      ctx.fillStyle = player.color
+      ctx.arc(player.x, player.y, 12, 0, Math.PI * 2)
+      ctx.fill()
+
+      // Draw player number
+      ctx.fillStyle = 'white'
+      ctx.font = 'bold 12px Arial'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(player.id.toString(), player.x, player.y)
     })
 
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) {
-        chunksRef.current.push(e.data)
+    // Draw ball with shadow
+    ctx.beginPath()
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
+    ctx.arc(ball.x + 2, ball.y + 2, 6, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.fillStyle = '#ffeb3b'
+    ctx.arc(ball.x, ball.y, 6, 0, Math.PI * 2)
+    ctx.fill()
+
+    if (showArrows) {
+      // Draw actions
+      actions.forEach((action, index) => {
+        action.movements.forEach((move) => {
+          drawArrow(ctx, move.start.x, move.start.y, move.end.x, move.end.y, 
+            move.playerId ? (move.isSimultaneous ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.8)') 
+            : (move.isSimultaneous ? 'rgba(255, 165, 0, 0.6)' : 'rgba(255, 165, 0, 0.8)'))
+        })
+        
+        // Draw action number
+        const lastMove = action.movements[action.movements.length - 1]
+        const midX = (lastMove.start.x + lastMove.end.x) / 2
+        const midY = (lastMove.start.y + lastMove.end.y) / 2
+        ctx.fillStyle = 'white'
+        ctx.strokeStyle = 'black'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(midX, midY, 10, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.stroke()
+        ctx.fillStyle = 'black'
+        ctx.font = 'bold 12px Arial'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText((index + 1).toString(), midX, midY)
+      })
+
+      // Draw current action
+      if (currentAction && isDrawing) {
+        currentAction.movements.forEach((move) => {
+          drawArrow(ctx, move.start.x, move.start.y, move.end.x, move.end.y, 
+            move.playerId ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 165, 0, 0.4)')
+        })
       }
     }
 
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `padel-simulation-${new Date().toISOString()}.webm`
-      a.click()
-      URL.revokeObjectURL(url)
-      chunksRef.current = []
-      setRecordingDuration(0)
-    }
+    // Draw free-form drawings
+    ctx.strokeStyle = '#ef4444'
+    ctx.lineWidth = 2
+    freeDrawings.forEach((drawing) => {
+      ctx.beginPath()
+      ctx.moveTo(drawing.start.x, drawing.start.y)
+      ctx.lineTo(drawing.end.x, drawing.end.y)
+      ctx.stroke()
+    })
 
-    mediaRecorderRef.current = mediaRecorder
-    mediaRecorder.start()
-    setIsRecording(true)
-    setRecordingDuration(0)
-  }
+    // Draw tutorial overlay if enabled
+    if (showTutorial) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+      ctx.fillRect(0, 0, COURT_WIDTH, COURT_HEIGHT)
+      ctx.fillStyle = 'white'
+      ctx.font = '20px Arial'
+      ctx.textAlign = 'center'
+      ctx.fillText('Welcome to Padel Tactical Simulator!', COURT_WIDTH / 2, COURT_HEIGHT / 2 - 40)
+      ctx.font = '16px Arial'
+      ctx.fillText('1. Select a player or ball from the toolbox', COURT_WIDTH / 2, COURT_HEIGHT / 2)
+      ctx.fillText('2. Click and drag on the court to create movements', COURT_WIDTH / 2, COURT_HEIGHT / 2 + 30)
+      ctx.fillText('3. Use the controls below to adjust speed and direction', COURT_WIDTH / 2, COURT_HEIGHT / 2 + 60)
+      ctx.fillText('Click anywhere to start', COURT_WIDTH / 2, COURT_HEIGHT / 2 + 100)
+    }
+  }, [players, ball, actions, currentAction, showArrows, freeDrawings, showTutorial, isDrawing])
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -144,7 +258,11 @@ export function PadelSimulator() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const drawCourt = () => {
+  useEffect(() => {
+    drawCourt()
+  }, [players, ball, actions, currentAction, showArrows, freeDrawings, drawCourt])
+
+  const startRecording = () => {
     const canvas = canvasRef.current
     if (!canvas) return
 

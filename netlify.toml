@@ -7,11 +7,24 @@
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_VERSION = "18.17.0"
 
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
 # Needed for Netlify Edge Functions
 [functions]
   included_files = [".next/server/**", ".next/static/**"]
 
-# This redirect ensures that all routes are handled by Next.js
+# These redirects ensure that all routes are handled by Next.js
+[[redirects]]
+  from = "/_next/*"
+  to = "/_next/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/nextjs-server"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"

@@ -269,7 +269,36 @@ export function PadelSimulator() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Clear canvas
+    const stream = canvas.captureStream(30) // 30 FPS
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: 'video/webm;codecs=vp9'
+    })
+    
+    mediaRecorderRef.current = mediaRecorder
+    chunksRef.current = []
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        chunksRef.current.push(e.data)
+      }
+    }
+
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `padel-simulation-${Date.now()}.webm`
+      a.click()
+      URL.revokeObjectURL(url)
+      chunksRef.current = []
+      setRecordingDuration(0)
+    }
+
+    mediaRecorder.start()
+    setIsRecording(true)
+
+    // Clear canvas for recording
     ctx.clearRect(0, 0, COURT_WIDTH, COURT_HEIGHT)
 
     // Draw court background

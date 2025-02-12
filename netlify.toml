@@ -3,9 +3,6 @@
   publish = ".next"
   functions = "netlify/functions"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-
 [build.environment]
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_VERSION = "18.17.0"
@@ -14,17 +11,7 @@
 [functions]
   included_files = [".next/server/**", ".next/static/**"]
 
-# These redirects ensure that all routes are handled by Next.js
-[[redirects]]
-  from = "/_next/*"
-  to = "/_next/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/nextjs-server"
-  status = 200
-
+# This redirect ensures that all routes are handled by Next.js
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"

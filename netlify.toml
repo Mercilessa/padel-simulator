@@ -6,26 +6,33 @@
 [build.environment]
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_VERSION = "18.17.0"
+  NEXT_USE_NETLIFY_EDGE = "true"
+  NEXT_FORCE_EDGE_IMAGES = "true"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Needed for Netlify Edge Functions
 [functions]
   included_files = [".next/server/**", ".next/static/**"]
+  node_bundler = "esbuild"
 
-# These redirects ensure that all routes are handled by Next.js
 [[redirects]]
-  from = "/_next/*"
-  to = "/_next/:splat"
+  from = "/_next/static/*"
+  to = "/_next/static/:splat"
   status = 200
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/nextjs-server"
+  from = "/_next/image*"
+  to = "/_next/image:splat"
+  status = 200
+
+[[redirects]]
+  from = "/_next/data/*"
+  to = "/_next/data/:splat"
   status = 200
 
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/nextjs-server"
   status = 200
+  force = true
